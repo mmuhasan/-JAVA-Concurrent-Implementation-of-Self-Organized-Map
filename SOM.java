@@ -12,6 +12,8 @@ public class SOM extends HexGrid<SOMNode>{
 	
 	int m_iNumIterations	= 5000;
 	static 	SOMNode[] 	gridWeights;
+	static SimResAr  res = new SimResAr();
+
 	
 	SOM(int r,int c,int d)
 	{
@@ -24,37 +26,29 @@ public class SOM extends HexGrid<SOMNode>{
 	}
 	
 	
-	class threadSimData implements Callable<SOMNode>{
+	class threadSimData implements Runnable{
 		
 		SOMData d1;
+		int i;
 		
-		public threadSimData(SOMData somData) {
+		public threadSimData(SOMData somData,int x) {
 			d1 = somData;
+			i  = x;
 		}
 
 		@Override
-		public SOMNode call() throws Exception {
-			return findBMU(d1);
-		}
-		
-	}
-	@SuppressWarnings("unchecked")
-	public SimResAr simulate(SOMData[] data) throws InterruptedException, ExecutionException {
-		
-		ExecutorService pool		= Executors.newFixedThreadPool(3);
-		Future<SOMNode>[] futures	= new Future[data.length];
-	
-		int		i;
-		for(i=0;i<data.length;i++)
-		{
-			futures[i] = pool.submit(new threadSimData(data[i]));
-		}
-		
-		SimResAr  res = new SimResAr();
-		
-		for(i=0;i<data.length;i++)
-		{
-			SOMNode d  = (SOMNode) futures[i].get();
+		public void run() {
+			SOMNode d = null;
+			try {
+				d = findBMU(d1);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (ExecutionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
 			/** group id **/
 			int group_id=-1;
 			for(int x=0;x<gridWeights.length;x++)
@@ -68,7 +62,19 @@ public class SOM extends HexGrid<SOMNode>{
 			if(res.search(group_id)>1)
 				res.addToGroup(group_id, i);
 			else res.addNewGroup(group_id, i);
-		}		
+		}
+	}
+
+	public SimResAr simulate(SOMData[] data) throws InterruptedException, ExecutionException {
+		
+		ExecutorService pool		= Executors.newFixedThreadPool(10);
+	
+		int		i;
+		for(i=0;i<data.length;i++)
+		{
+			pool.execute(new threadSimData(data[i],i));
+		}
+		
 		
 		pool.shutdown();
 		try {
